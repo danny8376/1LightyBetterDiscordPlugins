@@ -3,7 +3,7 @@
  * @description Simple library to complement plugins with shared code without lowering performance. Also adds needed buttons to some plugins.
  * @author 1Lighty
  * @authorId 239513071272329217
- * @version 1.4.16
+ * @version 1.4.19
  * @invite NYvWdN5
  * @donate https://paypal.me/lighty13
  * @source https://github.com/1Lighty/BetterDiscordPlugins/blob/master/Plugins/1XenoLib.plugin.js
@@ -106,7 +106,7 @@ module.exports = (() => {
           twitter_username: ''
         }
       ],
-      version: '1.4.16',
+      version: '1.4.19',
       description: 'Simple library to complement plugins with shared code without lowering performance. Also adds needed buttons to some plugins.',
       github: 'https://github.com/1Lighty',
       github_raw: 'https://raw.githubusercontent.com/1Lighty/BetterDiscordPlugins/master/Plugins/1XenoLib.plugin.js'
@@ -115,12 +115,7 @@ module.exports = (() => {
       {
         title: 'Fixed',
         type: 'fixed',
-        items: ['Fixed not loading', 'Fixed changelog so it sorta works again', 'Thanks copilot..']
-      },
-      {
-        type: 'image',
-        src: 'https://i.imgur.com/Nvm5B43.png',
-        height: 56
+        items: ['HOTFIX for not working at all']
       }
     ],
     defaultConfig: [
@@ -551,8 +546,8 @@ module.exports = (() => {
         line-height: 0;
       }
       .selected-xenoLib.option-xenoLib {
-        background-color: var(--brand-experiment);
-        border-color: var(--brand-experiment);
+        background-color: var(--brand-500);
+        border-color: var(--brand-500);
         box-shadow: 0 2px 0 rgba(0,0,0,.3);
         opacity: 1;
       }
@@ -605,7 +600,7 @@ module.exports = (() => {
         background-color: rgba(0,0,0,.1);
         padding-bottom: 56.25%;
         border-radius: 8px;
-        border: 2px solid var(--brand-experiment);
+        border: 2px solid var(--brand-500);
       }
       .xenoLib-position-hidden-input {
         opacity: 0;
@@ -909,8 +904,31 @@ module.exports = (() => {
 
 
     try {
-      XenoLib.ReactComponents.ButtonOptions = WebpackModules.getByProps('Button', 'ButtonColors');
-      XenoLib.ReactComponents.Button = WebpackModules.getByProps('Button', 'ButtonColors').Button;
+
+      const ButtonOptionsRaw = ZLibrary.WebpackModules.getModule(e => {
+        if (typeof e === 'function') return false;
+        const possFuncs = Object.values(e);
+        if (possFuncs.length < 3 || possFuncs.length > 8) return false;
+        if (!possFuncs.some(e => typeof e === 'object' && e?.BRAND_INVERTED)) return false;
+        return true;
+      })
+      let ButtonOptions = {};
+      for (let item of Object.values(ButtonOptionsRaw)) {
+        if (item.OUTLINED) ButtonOptions.ButtonLooks = item;
+        else if (item.BRAND) ButtonOptions.ButtonColors = item;
+        else if (item.SMALL) ButtonOptions.ButtonSizes = item;
+        else if (typeof item === 'function') {
+          const funcString = item.toString();
+          if (funcString.includes('.disabledButtonWrapper,')) ButtonOptions.Button = item;
+          // else if (funcString.match(/to:\w,onClick:\w,onMouseUp:\w/)) ButtonOptions.ButtonLink = item;
+          // else console.log('Unknown item!', item);
+        }
+        //else console.log('Unknown item!', item);
+        // there is 1 more func called "getButtonStyle" but we don't care about it :v
+      }
+      if (ButtonOptions.Button.Link) ButtonOptions.ButtonLink = ButtonOptions.Button.Link;
+      XenoLib.ReactComponents.ButtonOptions = ButtonOptions;
+      XenoLib.ReactComponents.Button = ButtonOptions.Button;
     } catch (e) {
       Logger.stacktrace('Error getting Button component', e);
     }
@@ -2275,18 +2293,32 @@ module.exports = (() => {
       }
     }
 
-    const ThemeProvider = WebpackModules.getByProps('RootThemeContextProvider').RootThemeContextProvider;
-    const useSyncExternalStore = WebpackModules.getByProps('useSyncExternalStore').useSyncExternalStore;
+    const ThemeProvider = (() => {
+      let RootThemeContextProvider = null;
+      WebpackModules.getModule(e => {
+        const possFuncs = Object.values(e);
+        if (possFuncs.length < 3 || possFuncs.length > 10) return false;
+        if (!possFuncs.some(e => typeof e === 'function' && e.toString().includes('useThemeContext must be used within a ThemeContext.Provider'))) return false;
+        RootThemeContextProvider = possFuncs.find(e => e.toString().match(/theme:\w,primaryColor:\w,secondaryColor:\w,/));
+        return true;
+      })
+      return RootThemeContextProvider;
+    })() || (props => props.children);
+    // const useSyncExternalStore = WebpackModules.getByProps('useSyncExternalStore').useSyncExternalStore;
     const ThemeStore = WebpackModules.getModule(m => m.theme);
 
     function DiscordThemeProviderWrapper(props) {
-      const theme = useSyncExternalStore([ThemeStore], () => ThemeStore.theme);
+      const theme = /* React.useSyncExternalStore([ThemeStore], () => ThemeStore.theme) */ ThemeStore.theme;
       return React.createElement(ThemeProvider, { theme }, props.children);
+    }
+
+    function DiscordThemeProviderWrapperWrapper(props) {
+      return React.createElement(DiscordThemeProviderWrapper, {}, props.children);
     }
 
     class SwitchItemWrapper extends React.PureComponent {
       render() {
-        return React.createElement(DiscordThemeProviderWrapper, {}, React.createElement(DiscordModules.SwitchRow, this.props));
+        return React.createElement(DiscordThemeProviderWrapperWrapper, {}, React.createElement(DiscordModules.SwitchRow, this.props));
       }
     }
 
@@ -2298,18 +2330,27 @@ module.exports = (() => {
       }
 
       onAdded() {
-        const reactElement = ReactDOM.render(React.createElement(SwitchItemWrapper, {
+        const root = ReactDOM.createRoot(this.getElement());
+        const ref = React.createRef();
+        const reactElement = root.render(React.createElement(SwitchItemWrapper, {
+          ref: ref,
           children: this.name,
           note: this.note,
           disabled: this.disabled,
           hideBorder: false,
           value: this.value,
           onChange: e => {
-            reactElement.props.value = e;
-            reactElement.forceUpdate();
+            ref.current.props.value = e;
+            ref.current.forceUpdate();
             this.onChange(e);
           }
-        }), this.getElement());
+        }));
+
+        this.root = root;
+      }
+
+      onRemoved() {
+        this.root.unmount();
       }
     }
 
