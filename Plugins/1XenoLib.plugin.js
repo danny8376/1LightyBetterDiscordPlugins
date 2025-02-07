@@ -3,7 +3,7 @@
  * @description Simple library to complement plugins with shared code without lowering performance. Also adds needed buttons to some plugins.
  * @author 1Lighty
  * @authorId 239513071272329217
- * @version 1.4.19
+ * @version 1.4.21
  * @invite NYvWdN5
  * @donate https://paypal.me/lighty13
  * @source https://github.com/1Lighty/BetterDiscordPlugins/blob/master/Plugins/1XenoLib.plugin.js
@@ -106,16 +106,15 @@ module.exports = (() => {
           twitter_username: ''
         }
       ],
-      version: '1.4.19',
+      version: '1.4.21',
       description: 'Simple library to complement plugins with shared code without lowering performance. Also adds needed buttons to some plugins.',
       github: 'https://github.com/1Lighty',
       github_raw: 'https://raw.githubusercontent.com/1Lighty/BetterDiscordPlugins/master/Plugins/1XenoLib.plugin.js'
     },
     changelog: [
       {
-        title: 'Fixed',
         type: 'fixed',
-        items: ['HOTFIX for not working at all']
+        items: ['Minor fixes.']
       }
     ],
     defaultConfig: [
@@ -999,8 +998,8 @@ module.exports = (() => {
             footerProps.children.push(websiteLink ? ' | ' : null, sourceLink);
           }
           footerProps.children.push(websiteLink || sourceLink ? ' | ' : null, React.createElement('a', { className: 'bda-link bda-link-website', onClick: e => ContextMenuActions.openContextMenu(e, e => React.createElement(XenoLib.ReactComponents.ErrorBoundary, { label: 'Donate button CTX menu' }, React.createElement(ContextMenuWrapper, { menu: XenoLib.createContextMenuGroup([XenoLib.createContextMenuItem('Paypal', () => window.open('https://paypal.me/lighty13'), 'paypal'), XenoLib.createContextMenuItem('Ko-fi', () => window.open('https://ko-fi.com/lighty_'), 'kofi'), XenoLib.createContextMenuItem('Patreon', () => window.open('https://www.patreon.com/lightyp'), 'patreon')]), ...e }))) }, 'Donate'));
-          footerProps.children.push(' | ', supportServerLink || React.createElement('a', { className: 'bda-link bda-link-website', onClick: () => (LayerManager.popLayer(), InviteActions.acceptInviteAndTransitionToInviteChannel('NYvWdN5')) }, 'Support Server'));
-          footerProps.children.push(' | ', React.createElement('a', { className: 'bda-link bda-link-website', onClick: () => (_this.props.addon.plugin.showChangelog ? _this.props.addon.plugin.showChangelog() : Modals.showChangelogModal(`${_this.props.addon.plugin.getName()} Changelog`, _this.props.addon.plugin.getVersion(), _this.props.addon.plugin.getChanges())) }, 'Changelog'));
+          footerProps.children.push(' | ', supportServerLink || React.createElement('a', { className: 'bda-link bda-link-website', onClick: () => BdApi.UI.showInviteModal('NYvWdN5') }, 'Support Server'));
+          footerProps.children.push(' | ', React.createElement('a', { className: 'bda-link bda-link-website', onClick: () => (_this.props.addon.plugin.showChangelog ? _this.props.addon.plugin.showChangelog() : BdApi.UI.showChangelogModal(`${_this.props.addon.plugin.getName()} Changelog`, _this.props.addon.plugin.getVersion(), _this.props.addon.plugin.getChanges())) }, 'Changelog'));
           footerProps = null;
         };
         async function patchRewriteCard() {
@@ -1082,7 +1081,7 @@ module.exports = (() => {
                 style: {
                   flex: '2 1 auto'
                 },
-                onClick: () => (LayerManager.popLayer(), InviteActions.acceptInviteAndTransitionToInviteChannel('NYvWdN5'))
+                onClick: () => BdApi.UI.showInviteModal('NYvWdN5')
               },
               'Support server'
             )
@@ -1254,7 +1253,16 @@ module.exports = (() => {
         );
       }
     }
-    const NewModalStack = WebpackModules.getByProps('openModal', 'hasModalOpen');
+    const NewModalStack = BdApi.Webpack.getMangled(/\w=null!=\w\.modalKey\?\w\.modalKey:\w\(\)\(\)/, {
+      openModalAsync: BdApi.Webpack.Filters.byRegex(/\w=null!=\w\.modalKey\?\w\.modalKey:\w\(\)\(\)/),
+      openModal: BdApi.Webpack.Filters.byRegex(/Layer:\w,render:\w,onCloseRequest:null!=\w\?\w:\(\)=>\w\(\w,\w\),onCloseCallback:\w,/),
+      closeModal: BdApi.Webpack.Filters.byRegex(/null!=\w&&null!=\w\.onCloseCallback&&\w\.onCloseCallback\(\)/),
+      closeAllModals: BdApi.Webpack.Filters.byRegex(/getState\(\);for\(let \w in \w\)for\(let \w of \w\[\w\]\)\w\(\w\.key,\w\)/),
+      hasModalOpen: BdApi.Webpack.Filters.byRegex(/return \w\(\w\.getState\(\),\w,\w\)/),
+      modalStore: e => e.getState && e.setState && e.subscribe
+    });
+
+    XenoLib.ModalStack = NewModalStack;
 
     const ExtraButtonClassname = 'xenoLib-button';
     const TextClassname = 'xl-text-1SHFy0';
@@ -1475,10 +1483,60 @@ module.exports = (() => {
       }
     })();
     const ComponentRenderers = WebpackModules.getByProps('renderVideoComponent') || {};
-    const Heading = WebpackModules.getByProps('Heading')?.Heading || 'span';
+    const Heading = (() => Object.values(WebpackModules.getModule(e => {
+      const possFuncs = Object.values(e);
+      if (possFuncs.length !== 1) return false;
+      return possFuncs[0]?.render?.toString().match(/case"currentColor":\w="currentColor";break;case"none":\w=void 0;break;case"always-white":\w="white";/);
+    }))[0])() || 'span';
     /* MY CHANGELOG >:C */
     XenoLib.showChangelog = (title, version, changelog, footer, showDisclaimer) => {
       try {
+        let modalId = null;
+        const renderFooter = () => [
+          React.createElement(TextElement || 'span',
+            {
+              size: TextElement?.Sizes?.SIZE_12,
+              variant: 'text-xs/normal'
+            }, 'Need support? ',
+            React.createElement('a', {
+              className: XenoLib.joinClassNames(AnchorClasses.anchor, AnchorClasses.anchorUnderlineOnHover),
+              onClick: () => BdApi.UI.showInviteModal('NYvWdN5')
+            },
+              'Join my support server'
+            ),
+            '! Or consider donating via ',
+            React.createElement('a', {
+              className: XenoLib.joinClassNames(AnchorClasses.anchor, AnchorClasses.anchorUnderlineOnHover),
+              onClick: () => window.open('https://paypal.me/lighty13')
+            },
+              'Paypal'
+            ),
+            ', ',
+            React.createElement('a', {
+              className: XenoLib.joinClassNames(AnchorClasses.anchor, AnchorClasses.anchorUnderlineOnHover),
+              onClick: () => window.open('https://ko-fi.com/lighty_')
+            },
+              'Ko-fi'
+            ),
+            ', ',
+            React.createElement('a', {
+              className: XenoLib.joinClassNames(AnchorClasses.anchor, AnchorClasses.anchorUnderlineOnHover),
+              onClick: () => window.open('https://www.patreon.com/lightyp')
+            },
+              'Patreon'
+            ),
+            '!',
+            showDisclaimer ? '\nBy using these plugins, you agree to being part of the anonymous user counter, unless disabled in settings.' : ''
+          )
+        ];
+        modalId = BdApi.UI.showChangelogModal({
+          title,
+          subtitle: `Version ${version}`,
+          footer: footer || renderFooter(),
+          changes: changelog
+        });
+        return;
+
         const ChangelogClasses = DiscordClasses.Changelog;
         const items = [];
         let isFistType = true;
@@ -1526,8 +1584,53 @@ module.exports = (() => {
               isFistType = false;
           }
         }
-        const renderFooter = () => ['Need support? ', React.createElement('a', { className: XenoLib.joinClassNames(AnchorClasses.anchor, AnchorClasses.anchorUnderlineOnHover), onClick: () => Modals.showConfirmationModal('Please confirm', 'Are you sure you want to join my support server?', { confirmText: 'Yes', cancelText: 'Nope', onConfirm: () => (LayerManager.popLayer(), ModalStack.pop(), NewModalStack.closeAllModals(), InviteActions.acceptInviteAndTransitionToInviteChannel('NYvWdN5')) }) }, 'Join my support server'), '! Or consider donating via ', React.createElement('a', { className: XenoLib.joinClassNames(AnchorClasses.anchor, AnchorClasses.anchorUnderlineOnHover), onClick: () => window.open('https://paypal.me/lighty13') }, 'Paypal'), ', ', React.createElement('a', { className: XenoLib.joinClassNames(AnchorClasses.anchor, AnchorClasses.anchorUnderlineOnHover), onClick: () => window.open('https://ko-fi.com/lighty_') }, 'Ko-fi'), ', ', React.createElement('a', { className: XenoLib.joinClassNames(AnchorClasses.anchor, AnchorClasses.anchorUnderlineOnHover), onClick: () => window.open('https://www.patreon.com/lightyp') }, 'Patreon'), '!', showDisclaimer ? '\nBy using these plugins, you agree to being part of the anonymous user counter, unless disabled in settings.' : ''];
-        NewModalStack.openModal(props => React.createElement(XenoLib.ReactComponents.ErrorBoundary, { label: 'Changelog', onError: () => props.onClose() }, React.createElement(ChangelogModal, { className: ChangelogClasses.container, selectable: true, onScroll: _ => _, onClose: _ => _, renderHeader: () => React.createElement(FlexChild.Child, { grow: 1, shrink: 1 }, React.createElement(Heading, { variant: 'heading-lg/semibold' }, title), React.createElement(TextElement, { size: TextElement?.Sizes?.SIZE_12, variant: 'text-xs/normal', className: ChangelogClasses.date }, `Version ${version}`)), renderFooter: () => React.createElement(FlexChild.Child, { gro: 1, shrink: 1 }, React.createElement(TextElement, { size: TextElement?.Sizes?.SIZE_12, variant: 'text-xs/normal' }, footer ? (typeof footer === 'string' ? FancyParser(footer) : footer) : renderFooter())), children: items, ...props })));
+        NewModalStack.openModal(props =>
+          React.createElement(XenoLib.ReactComponents.ErrorBoundary,
+            {
+              label: 'Changelog',
+              onError: () => props.onClose()
+            },
+            React.createElement(/* ChangelogModal */ WebpackModules.getByProps('ConfirmModal')?.ConfirmModal || (() => null),
+              {
+                className: WebpackModules.getModule(e => e?.content && e.modal && (Object.keys(e).length === 2))?.content || '',
+                selectable: true,
+                onScroll: _ => _,
+                onClose: _ => _,
+                ...props
+              },
+              React.createElement(FlexChild?.Child || 'div',
+                {
+                  grow: 1,
+                  shrink: 1
+                },
+                React.createElement(Heading,
+                  {
+                    variant: 'heading-lg/semibold'
+                  },
+                  title),
+                React.createElement(TextElement || 'span',
+                  {
+                    size: TextElement?.Sizes?.SIZE_12,
+                    variant: 'text-xs/normal',
+                    className: ChangelogClasses.date
+                  },
+                  `Version ${version}`
+                )
+              ),
+              items,
+              React.createElement(FlexChild?.Child || 'div',
+                {
+                  gro: 1,
+                  shrink: 1
+                }, React.createElement(TextElement || 'span',
+                  {
+                    size: TextElement?.Sizes?.SIZE_12,
+                    variant: 'text-xs/normal'
+                  },
+                  footer ? (typeof footer === 'string' ? FancyParser(footer) : footer) : renderFooter()
+                )
+              )
+            )));
       } catch (err) {
         Logger.stacktrace('Failed to show changelog', err);
       }
@@ -2190,7 +2293,7 @@ module.exports = (() => {
     const PositionSelectorWrapperClassname = 'xenoLib-position-wrapper';
     const PositionSelectorSelectedClassname = 'selected-xenoLib';
     const PositionSelectorHiddenInputClassname = 'xenoLib-position-hidden-input';
-    const FormText = WebpackModules.getByProps('FormText')?.FormText;
+    const FormText = Object.values(BdApi.Webpack.getBySource(/return \w\?\w=\w\.DISABLED:\w&&\(\w=\w\.SELECTABLE\),/) || {}).find(e => typeof e === 'function');
     class NotificationPosition extends React.PureComponent {
       constructor(props) {
         super(props);
