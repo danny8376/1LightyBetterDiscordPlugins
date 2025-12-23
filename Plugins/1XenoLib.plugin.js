@@ -3,7 +3,7 @@
  * @description Simple library to complement plugins with shared code without lowering performance. Also adds needed buttons to some plugins.
  * @author 1Lighty
  * @authorId 239513071272329217
- * @version 1.4.25
+ * @version 1.4.28
  * @invite NYvWdN5
  * @donate https://paypal.me/lighty13
  * @source https://github.com/1Lighty/BetterDiscordPlugins/blob/master/Plugins/1XenoLib.plugin.js
@@ -95,17 +95,21 @@ try {
 
   const HOTFIXES = {
     'className: "react-wrapper", ref: "element"': 'className: "react-wrapper", ref: (e) => {if (!this.refs) this.refs = {}; this.refs.element = e;}',
-    '    /** Fired when root node added to DOM */\n    onAdded() {\n        const reactElement = modules__WEBPACK_IMPORTED_MODULE_1__.DiscordModules.ReactDOM.render(modules__WEBPACK_IMPORTED_MODULE_1__.DiscordModules.React.createElement(ReactSetting, Object.assign({\n            title: this.name,\n            type: this.type,\n            note: this.note,\n        }, this.props)), this.getElement());\n\n        if (this.props.onChange) reactElement.props.onChange = this.props.onChange(reactElement);\n        reactElement.forceUpdate();\n    }\n\n    /** Fired when root node removed from DOM */\n    onRemoved() {\n        modules__WEBPACK_IMPORTED_MODULE_1__.DiscordModules.ReactDOM.unmountComponentAtNode(this.getElement());\n    }': '    /** Fired when root node added to DOM */\n    onAdded() {\n        this.rroot = BdApi.ReactDOM.createRoot(this.getElement());\n        this.rroot.render(modules__WEBPACK_IMPORTED_MODULE_1__.DiscordModules.React.createElement(ReactSetting, Object.assign({\n            title: this.name,\n            type: this.type,\n            note: this.note,\n        }, this.props)));\n\n        const instance = this.rroot?._internalRoot?.current?.child?.stateNode;\n        if (!instance) return;\n        if (this.props.onChange) instance.props.onChange = this.props.onChange(instance);\n        instance.forceUpdate();\n    }\n\n    /** Fired when root node removed from DOM */\n    onRemoved() {\n        this.rroot.unmount();\n    }',
-    "/** \n * Creates a textbox using discord's built in textbox.\n * @memberof module:Settings\n * @extends module:Settings.SettingField\n */\nclass Textbox": "/** \n * Creates a textbox using discord's built in textbox.\n * @memberof module:Settings\n * @extends module:Settings.SettingField\n */\n\nclass TextBoxWrapper extends BdApi.React.PureComponent {\n    constructor(...args) {\n        super(...args);\n        this.state = {\n          value: this.props.value\n        };\n\n        this.onChange = this.onChange.bind(this);\n      }\n\n      onChange(value) {\n        this.setState({ value });\n        this.props.onChange(value);\n      }\n\n      render() {\n        return BdApi.React.createElement(modules__WEBPACK_IMPORTED_MODULE_1__.DiscordModules.Textbox, { ...this.props, value: this.state.value, onChange: this.onChange });\n      }\n}\n\nclass Textbox",
-    "super(name, note, onChange, modules__WEBPACK_IMPORTED_MODULE_1__.DiscordModules.Textbox, {": "super(name, note, onChange, TextBoxWrapper, {"
+    '    /** Fired when root node added to DOM */\n    onAdded() {\n        const reactElement = modules__WEBPACK_IMPORTED_MODULE_1__.DiscordModules.ReactDOM.render(modules__WEBPACK_IMPORTED_MODULE_1__.DiscordModules.React.createElement(ReactSetting, Object.assign({\n            title: this.name,\n            type: this.type,\n            note: this.note,\n        }, this.props)), this.getElement());\n\n        if (this.props.onChange) reactElement.props.onChange = this.props.onChange(reactElement);\n        reactElement.forceUpdate();\n    }\n\n    /** Fired when root node removed from DOM */\n    onRemoved() {\n        modules__WEBPACK_IMPORTED_MODULE_1__.DiscordModules.ReactDOM.unmountComponentAtNode(this.getElement());\n    }': ['    /** Fired when root node added to DOM */\n    onAdded() {\n        this.rroot = BdApi.ReactDOM.createRoot(this.getElement());\n        this.rroot.render(modules__WEBPACK_IMPORTED_MODULE_1__.DiscordModules.React.createElement(ReactSetting, Object.assign({\n            title: this.name,\n            type: this.type,\n            note: this.note,\n        }, this.props)));\n\n        const instance = this.rroot?._internalRoot?.current?.child?.stateNode;\n        if (!instance) return;\n        if (this.props.onChange) instance.props.onChange = this.props.onChange(instance);\n        instance.forceUpdate();\n    }\n\n    /** Fired when root node removed from DOM */\n    onRemoved() {\n        this.rroot.unmount();\n    }', '    /** Fired when root node added to DOM */\n    onAdded() {\n        this.rroot = BdApi.ReactDOM.createRoot(this.getElement());\n        this.rroot.render(modules__WEBPACK_IMPORTED_MODULE_1__.DiscordModules.React.createElement(ReactSetting, Object.assign({\n            title: this.name,\n            type: this.type,\n            note: this.note,\n            ref: instance => {\n                if (!instance || !this.props.onChange) return;\n                const inst = this.rroot._internalRoot?.current?.child;\n                if (!inst) return;\n                this._onChange = this.props.onChange(inst.stateNode)\n            }\n        }, this.props, { onChange: (...args) => this._onChange(...args) })));\n    }\n\n    /** Fired when root node removed from DOM */\n    onRemoved() {\n        this.rroot.unmount();\n    }'],
+    '        const wasEnabled = BdApi?.isSettingEnabled("settings", "general", "showToasts");\n        if (wasEnabled) BdApi?.disableSetting("settings", "general", "showToasts");\n        this._reloadPlugins();\n        if (wasEnabled) BdApi?.enableSetting("settings", "general", "showToasts");': ''
   }
 
   let ZLibCode = fs.readFileSync(path.join(__dirname, '0PluginLibrary.plugin.js'), 'utf8');
   let gotChanged = false;
 
   for (const [key, value] of Object.entries(HOTFIXES)) {
-    if (!ZLibCode.includes(key)) continue;
-    ZLibCode = ZLibCode.replace(key, value);
+    if ((Array.isArray(value) && !ZLibCode.includes(value[0]) && !ZLibCode.includes(key)) || (!Array.isArray(value) && !ZLibCode.includes(key))) continue;
+    if (Array.isArray(value) && ZLibCode.includes(value[0])) {
+      ZLibCode = ZLibCode.replace(value[0], value[1]);
+      gotChanged = true;
+      continue;
+    }
+    ZLibCode = ZLibCode.replace(key, Array.isArray(value) ? value[1] : value);
     gotChanged = true;
   }
   if (gotChanged) {
@@ -132,7 +136,7 @@ module.exports = (() => {
           twitter_username: ''
         }
       ],
-      version: '1.4.25',
+      version: '1.4.28',
       description: 'Simple library to complement plugins with shared code without lowering performance. Also adds needed buttons to some plugins.',
       github: 'https://github.com/1Lighty',
       github_raw: 'https://raw.githubusercontent.com/1Lighty/BetterDiscordPlugins/master/Plugins/1XenoLib.plugin.js'
@@ -140,7 +144,7 @@ module.exports = (() => {
     changelog: [
       {
         type: 'fixed',
-        items: ['Fixed changelog error.']
+        items: ['Library dependency check and update check fix.']
       }
     ],
     defaultConfig: [
@@ -237,9 +241,9 @@ module.exports = (() => {
   const buildPlugin = ([Plugin, Api]) => {
     const start = performance.now();
     const { Settings, Modals, Utilities, WebpackModules, DiscordModules, ColorConverter, DiscordClasses, ReactTools, ReactComponents, Logger, PluginUpdater, PluginUtilities, Structs } = Api;
-    const { React, ModalStack, ContextMenuActions, ChannelStore, GuildStore, UserStore, DiscordConstants, PrivateChannelActions, LayerManager, InviteActions, FlexChild, Changelog: ChangelogModal, SelectedChannelStore, SelectedGuildStore, Moment } = DiscordModules;
+    const { ModalStack, ContextMenuActions, ChannelStore, GuildStore, UserStore, DiscordConstants, PrivateChannelActions, LayerManager, InviteActions, FlexChild, Changelog: ChangelogModal, SelectedChannelStore, SelectedGuildStore, Moment } = DiscordModules;
 
-    const { ReactDOM } = BdApi;
+    const { React, ReactDOM } = BdApi;
 
     if (window.__XL_waitingForWatcherTimeout) clearTimeout(window.__XL_waitingForWatcherTimeout);
 
@@ -666,14 +670,24 @@ module.exports = (() => {
       .xenoLib-multiInput.xenoLib-multiInput-error {
         border-color: hsl(359,calc(var(--saturation-factor, 1)*82.6%),59.4%);
       }
-      .xenoLib-multiInputFirst {
+      .xenoLib-multiInput > div[class*="container_"] {
         -webkit-box-flex: 1;
         -ms-flex-positive: 1;
         flex-grow: 1
       }
-      .xenoLib-multiInputField {
+      .xenoLib-multiInputField,
+      .xenoLib-multiInput > div[class*="container_"] > div {
         border: none;
         background-color: transparent
+      }
+
+      .xenoLib-multiInputField {
+        width: 100%;
+        height: 100%;
+      }
+
+      .xenolib-switch {
+        margin: 16px 0pxl
       }
       `
     );
@@ -1132,9 +1146,10 @@ module.exports = (() => {
       return (mod && key && mod[key]) || null;
     })();
 
+    const TextboxComponent = BdApi.Webpack.getByRegex(/inputRef:\w,focusProps:\w,name:\w="",type:\w="text"/, { searchExports: true }) || (() => null);
+
     /* shared between FilePicker and ColorPicker */
     const MultiInputClassname = 'xenoLib-multiInput';
-    const MultiInputFirstClassname = 'xenoLib-multiInputFirst';
     const MultiInputFieldClassname = 'xenoLib-multiInputField';
     const ErrorMessageClassname = XenoLib.joinClassNames('xenoLib-error-text', XenoLib.getClass('errorMessage'), Utilities.getNestedProp(TextElement, 'Colors.ERROR'));
     const ErrorClassname = XenoLib.joinClassNames('xenoLib-multiInput-error', XenoLib.getClass('input error'));
@@ -1142,14 +1157,14 @@ module.exports = (() => {
     try {
       class DelayedCall {
         constructor(delay, callback) {
-          this.delay = delay;
-          this.callback = callback;
-          this.timeout = null;
+          this._delay = delay;
+          this._callback = callback;
+          this._timeout = null;
         }
 
         delay() {
-          clearTimeout(this.timeout);
-          this.timeout = setTimeout(this.callback, this.delay);
+          clearTimeout(this._timeout);
+          this._timeout = setTimeout(this._callback, this._delay);
         }
       }
       const FsModule = require('fs');
@@ -1176,7 +1191,15 @@ module.exports = (() => {
           this.delayedCallVerifyPath = new DelayedCall(500, () => this.checkInvalidDir());
         }
         checkInvalidDir(doSave) {
-          FsModule.access(this.state.path, FsModule.constants.W_OK, error => {
+          FsModule.stat(this.state.path, {}, error => {
+            const invalid = (error && error.message.match(/.*: (.*), stat '/)[1]) || null;
+            this.setState({ error: invalid });
+            if (this.props.saveOnEnter && !doSave) return;
+            if (invalid) this.props.onChange(this.props.nullOnInvalid ? null : '');
+            else this.props.onChange(this.state.path);
+          });
+          return; // both access and constants are not exposed by BD
+          FsModule.access(this.state.path, 2 /* FsModule.constants.W_OK */, error => {
             const invalid = (error && error.message.match(/.*: (.*), access '/)[1]) || null;
             this.setState({ error: invalid });
             if (this.props.saveOnEnter && !doSave) return;
@@ -1185,7 +1208,7 @@ module.exports = (() => {
           });
         }
         handleOnBrowse() {
-          DiscordNative.fileManager.showOpenDialog({ title: this.props.title, properties: this.props.properties }).then(({ filePaths: [path] }) => {
+          DiscordNative.fileManager.showOpenDialog({ title: this.props.title, properties: this.props.properties }).then(([path]) => {
             if (path) this.handleChange(path);
           });
         }
@@ -1207,7 +1230,7 @@ module.exports = (() => {
             React.createElement(
               'div',
               { className: XenoLib.joinClassNames(MultiInputClassname, n) },
-              React.createElement(DiscordModules.Textbox, {
+              React.createElement(TextboxComponent, {
                 value: this.state.path,
                 placeholder: this.props.placeholder,
                 onChange: this.handleChange,
@@ -1215,8 +1238,7 @@ module.exports = (() => {
                 onBlur: () => this.setState({ multiInputFocused: false }),
                 onKeyDown: this.handleKeyDown,
                 autoFocus: false,
-                className: MultiInputFirstClassname,
-                inputClassName: MultiInputFieldClassname
+                className: MultiInputFieldClassname
               }),
               React.createElement(XenoLib.ReactComponents.Button, { onClick: this.handleOnBrowse, color: (!!this.state.error && XenoLib.ReactComponents.ButtonOptions.ButtonColors.RED) || XenoLib.ReactComponents.ButtonOptions.ButtonColors.GREY, look: XenoLib.ReactComponents.ButtonOptions.ButtonLooks.GHOST, size: XenoLib.ReactComponents.Button.Sizes.MEDIUM }, 'Browse')
             ),
@@ -1346,15 +1368,14 @@ module.exports = (() => {
                 height: 38
               }
             }),
-            React.createElement(DiscordModules.Textbox, {
+            React.createElement(TextboxComponent, {
               value: this.state.value,
               placeholder: 'Hex color',
               onChange: this.handleChange,
               onFocus: () => this.setState({ multiInputFocused: true }),
               onBlur: () => this.setState({ multiInputFocused: false }),
               autoFocus: false,
-              className: MultiInputFirstClassname,
-              inputClassName: MultiInputFieldClassname
+              className: MultiInputFieldClassname
             }),
             React.createElement(
               XenoLib.ReactComponents.Button,
@@ -1398,6 +1419,37 @@ module.exports = (() => {
       }
     }
     XenoLib.Settings = {};
+
+    class TextboxWrapper extends React.PureComponent {
+      constructor(...args) {
+        super(...args);
+        this.state = { value: this.props.value };
+        this.onChange = this.onChange.bind(this);
+      }
+      onChange(value) {
+        this.setState({ value });
+        this.props.onChange(value);
+      }
+      render() {
+        return React.createElement(TextboxComponent, { ...this.props, value: this.state.value, onChange: this.onChange });
+      }
+    }
+
+    XenoLib.Settings.Textbox = class TextboxSettingField extends Settings.SettingField {
+      constructor(name, note, value, onChange, options = {}) {
+        const { placeholder = "", disabled = false } = options;
+        super(name, note, onChange, TextboxWrapper, {
+          onChange: textbox => val => {
+            this.onChange(val);
+          },
+          value: value,
+          disabled: disabled,
+          placeholder: placeholder || ""
+        });
+      }
+    };
+
+
     XenoLib.Settings.FilePicker = class FilePickerSettingField extends Settings.SettingField {
       constructor(name, note, value, onChange, options = { properties: ['openDirectory', 'createDirectory'], placeholder: 'Path to folder', defaultPath: '' }) {
         super(name, note, onChange, XenoLib.ReactComponents.FilePicker || class b { }, {
@@ -1461,7 +1513,7 @@ module.exports = (() => {
       const Markdown = WebpackModules.getByProps('astParserFor', 'parse');
       try {
         const MentionRule = WebpackModules.find(e => e.react && e.react.toString().includes('className:"mention"'));
-        const ReactParserRules = WebpackModules.find(m => typeof m === 'function' && (m = m.toString()) && (m.toString().replace(/\n/g, '').search(/^function \w\(\w\){return{\.\.\.\w,link:\(0,\w.\w\)\(\w\)/) !== -1));
+        const ReactParserRules = WebpackModules.find(m => typeof m === 'function' && (m = m.toString()) && (m.toString().replace(/\n/g, '').search(/emoji:\w\(\w\),customEmoji:\w\(\w\),channelMention:\(0,\w.\w\)\(\w\),/) !== -1));
         const { RULES } = WebpackModules.getByProps('RULES');
 
         function mergeRules(rules) {
@@ -2331,7 +2383,7 @@ module.exports = (() => {
     const PositionSelectorWrapperClassname = 'xenoLib-position-wrapper';
     const PositionSelectorSelectedClassname = 'selected-xenoLib';
     const PositionSelectorHiddenInputClassname = 'xenoLib-position-hidden-input';
-    const FormText = Object.values(BdApi.Webpack.getBySource(/return \w\?\w=\w\.DISABLED:\w&&\(\w=\w\.SELECTABLE\),/) || {}).find(e => typeof e === 'function');
+    const FormText = BdApi.Webpack.getModule(e => e?.render?.toString?.()?.includes('"tag","selectable","className"'), { searchExports: true }) || ((e) => e.children);
     class NotificationPosition extends React.PureComponent {
       constructor(props) {
         super(props);
@@ -2392,8 +2444,9 @@ module.exports = (() => {
           React.createElement(
             FormText,
             {
-              type: FormText.Types.DESCRIPTION,
-              className: DiscordClasses.Margins.marginTop8
+              className: DiscordClasses.Margins.marginTop8,
+              color: 'text-secondary',
+              variant: 'text-sm/normal'
             },
             this.getSelected()
           )
@@ -2412,6 +2465,24 @@ module.exports = (() => {
       }
     }
 
+    const ThemeProviderWrapper = (() => {
+      const DOMNode = document.getElementById("app-mount");
+      const themeWrapper = Utilities.findInTree(DOMNode[Object.keys(DOMNode || {}).find(e => e.startsWith('__reactContainer'))], e => (e?.memoizedProps?.value?.theme && e?.memoizedProps?.value?.dynamicGraphicComponents), { walkable: ['child'] })
+      const value = themeWrapper?.memoizedProps?.value;
+      const type = themeWrapper?.type;
+      if (!value || typeof value.theme !== 'string' || !type) {
+        Logger.warn('XenoLib', 'Could not find Discord ThemeProvider, some settings may look off.');
+        return function ThemeProviderWrapper(props) {
+          return props.children;
+        };
+      }
+      return function ThemeProviderWrapper(props) {
+        return React.createElement(type, { value }, props.children);
+      };
+    })()
+
+    const RadioGroupComponent = BdApi.Webpack.getByStrings(',["label","description","required"]);', { searchExports: true });
+
     class RadioGroupWrapper extends React.PureComponent {
       constructor(...args) {
         super(...args);
@@ -2426,7 +2497,7 @@ module.exports = (() => {
       }
 
       render() {
-        return React.createElement(DiscordModules.RadioGroup, { ...this.props, value: this.state.value, onChange: this.onChange });
+        return React.createElement(RadioGroupComponent, { ...this.props, value: this.state.value, onChange: this.onChange });
       }
     }
 
@@ -2437,8 +2508,6 @@ module.exports = (() => {
           disabled: !!options.disabled,
           options: values,
           onChange: reactElement => option => {
-            reactElement.props.value = option.value;
-            reactElement.forceUpdate();
             this.onChange(option.value);
           },
           value: defaultValue
@@ -2446,28 +2515,7 @@ module.exports = (() => {
       }
     }
 
-    const ThemeProvider = (() => {
-      let RootThemeContextProvider = null;
-      WebpackModules.getModule(e => {
-        const possFuncs = Object.values(e);
-        if (possFuncs.length < 3 || possFuncs.length > 10) return false;
-        if (!possFuncs.some(e => typeof e === 'function' && e.toString().includes('useThemeContext must be used within a ThemeContext.Provider'))) return false;
-        RootThemeContextProvider = possFuncs.find(e => e.toString().match(/theme:\w,primaryColor:\w,secondaryColor:\w,/));
-        return true;
-      })
-      return RootThemeContextProvider;
-    })() || (props => props.children);
-    // const useSyncExternalStore = WebpackModules.getByProps('useSyncExternalStore').useSyncExternalStore;
-    const ThemeStore = WebpackModules.getModule(m => m.theme);
-
-    function DiscordThemeProviderWrapper(props) {
-      const theme = /* React.useSyncExternalStore([ThemeStore], () => ThemeStore.theme) */ ThemeStore.theme;
-      return React.createElement(ThemeProvider, { theme }, props.children);
-    }
-
-    function DiscordThemeProviderWrapperWrapper(props) {
-      return React.createElement(DiscordThemeProviderWrapper, {}, props.children);
-    }
+    const SwitchRow = WebpackModules.getModule(e => e?.toString?.().includes('data-toggleable-component":"switch"'), { searchExports: true }) || (() => 'SwitchRow not found');
 
     class SwitchItemWrapper extends React.PureComponent {
       constructor(...args) {
@@ -2485,7 +2533,7 @@ module.exports = (() => {
       }
 
       render() {
-        return React.createElement(DiscordThemeProviderWrapperWrapper, {}, React.createElement(DiscordModules.SwitchRow, { ...this.props, value: this.state.value, onChange: this.onChange }));
+        return React.createElement('div', { className: 'xenolib-switch' }, React.createElement(ThemeProviderWrapper, {}, React.createElement(SwitchRow, { ...this.props, checked: this.state.value, onChange: this.onChange })));
       }
     }
 
@@ -2499,8 +2547,8 @@ module.exports = (() => {
       onAdded() {
         const root = ReactDOM.createRoot(this.getElement());
         root.render(React.createElement(SwitchItemWrapper, {
-          children: this.name,
-          note: this.note,
+          label: this.name,
+          description: this.note,
           disabled: this.disabled,
           hideBorder: false,
           value: this.value,
@@ -2555,12 +2603,12 @@ module.exports = (() => {
       let setting = null;
       if (type == 'color') setting = new XenoLib.Settings.ColorPicker(name, note, value, onChange, { disabled: data.disabled, defaultColor: value });
       else if (type == 'dropdown') setting = new Settings.Dropdown(name, note, value, data.options, onChange);
-      else if (type == 'file') setting = new Settings.FilePicker(name, note, onChange);
+      else if (type == 'file') setting = new XenoLib.Settings.FilePicker(name, note, value, onChange, data.options);
       else if (type == 'keybind') setting = new Settings.Keybind(name, note, value, onChange);
       else if (type == 'radio') setting = new RadioGroup(name, note, value, data.options, onChange, { disabled: data.disabled });
       else if (type == 'slider') setting = new Settings.Slider(name, note, data.min, data.max, value, onChange, data);
       else if (type == 'switch') setting = new Switch(name, note, value, onChange, { disabled: data.disabled });
-      else if (type == 'textbox') setting = new Settings.Textbox(name, note, value, onChange, { placeholder: data.placeholder || '' });
+      else if (type == 'textbox') setting = new XenoLib.Settings.Textbox(name, note, value, onChange, { placeholder: data.placeholder || '' });
       if (id) setting.id = id;
       return setting;
     };
@@ -2614,7 +2662,6 @@ module.exports = (() => {
         if (super.load) super.load();
         try {
           if (!BdApi.Plugins) return; /* well shit what now */
-          if (!BdApi.isSettingEnabled) return;
           const list = BdApi.Plugins.getAll().filter(k => k._XL_PLUGIN || (k.instance && k.instance._XL_PLUGIN)).map(k => k.instance || k);
           for (let p = 0; p < list.length; p++) try {
             BdApi.Plugins.reload(list[p].getName());
@@ -2683,18 +2730,6 @@ module.exports = (() => {
                       setTimeout(() => {
                         try {
                           fs.writeFileSync(path.join(pluginsDir, newFile), body);
-                          if (window.pluginModule && window.pluginModule.loadPlugin) {
-                            BdApi.Plugins.reload(name);
-                            if (newFile !== file) window.pluginModule.loadPlugin(name);
-                            // eslint-disable-next-line curly
-                          } else if (BdApi.version ? !BdApi.isSettingEnabled('settings', 'addons', 'autoReload') : !BdApi.isSettingEnabled('fork-ps-5')) {
-                            // eslint-disable-next-line no-negated-condition
-                            if (newFile !== file) {
-                              // eslint-disable-next-line no-undef
-                              BdApi.showConfirmationModal('Hmm', 'You must reload in order to finish plugin installation', { onConfirm: () => location.reload() });
-                              isPluginEnabled = false;
-                            } else BdApi.Plugins.reload(name);
-                          }
                           if (isPluginEnabled) setTimeout(() => BdApi.Plugins.enable(name), 3000);
                         } catch (e) { }
                       }, 1000);
