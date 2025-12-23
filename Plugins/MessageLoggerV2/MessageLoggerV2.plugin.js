@@ -1,6 +1,6 @@
 /**
  * @name MessageLoggerV2
- * @version 1.9.5
+ * @version 1.9.7
  * @invite NYvWdN5
  * @donate https://paypal.me/lighty13
  * @website https://1lighty.github.io/BetterDiscordStuff/?plugin=MessageLoggerV2
@@ -44,7 +44,7 @@ module.exports = class MessageLoggerV2 {
     return 'MessageLoggerV2';
   }
   getVersion() {
-    return '1.9.5';
+    return '1.9.7';
   }
   getAuthor() {
     return 'Lighty';
@@ -77,7 +77,7 @@ module.exports = class MessageLoggerV2 {
       let iZeresPluginLibrary = BdApi.Plugins.get('ZeresPluginLibrary');
       if (iXenoLib && iXenoLib.instance) iXenoLib = iXenoLib.instance;
       if (iZeresPluginLibrary && iZeresPluginLibrary.instance) iZeresPluginLibrary = iZeresPluginLibrary.instance;
-      if (isOutOfDate(iXenoLib, '1.4.24')) XenoLibOutdated = true;
+      if (isOutOfDate(iXenoLib, '1.4.25')) XenoLibOutdated = true;
       if (isOutOfDate(iZeresPluginLibrary, '2.0.23')) ZeresPluginLibraryOutdated = true;
     }
     if (/* !global.XenoLib || !global.ZeresPluginLibrary || XenoLibOutdated || ZeresPluginLibraryOutdated */!BdApi.Plugins.get('XenoLib') || XenoLibOutdated) {
@@ -128,7 +128,7 @@ https://astranika.com/bd/download?plugin=1XenoLib`, {
         title: 'Fixed',
         type: 'fixed',
         items: [
-          'Fixed nothing showing up in the logger menu.',
+          'Fixed an internal Discord change causing the logger to malfunction, not properly showing edits and deletes anymore.',
         ]
       }
     ];
@@ -330,7 +330,7 @@ https://astranika.com/bd/download?plugin=1XenoLib`, {
     if (this.slowSaveModeStep) ZeresPluginLibrary.Logger.warn(this.getName(), 'Data file is too large, severity level', this.slowSaveModeStep);
 */
 
-    this.messageStore = ZeresPluginLibrary.WebpackModules.getByProps('getMessages', 'getMessage');
+    this.messageStore = ZeresPluginLibrary.WebpackModules.getByProps('focusedMessageId', 'getMessages', 'getMessage');
 
     this.ChannelStore = ZeresPluginLibrary.WebpackModules.getByProps('getChannel', 'getDMFromUserId');
     if (!this.settings.dontSaveData) {
@@ -483,7 +483,7 @@ https://astranika.com/bd/download?plugin=1XenoLib`, {
       getUserAsync: /* ZeresPluginLibrary.WebpackModules.getByProps('getUser', 'acceptAgreements').getUser */ () => Promise.resolve(),
       isBlocked: ZeresPluginLibrary.WebpackModules.getByProps('isBlocked').isBlocked,
       createMomentObject: ZeresPluginLibrary.WebpackModules.getByProps('createFromInputFallback'),
-      isMentioned: (e, id) => isMentioned({ userId: id, channelId: e.channel_id, mentionEveryone: e.mentionEveryone || e.mention_everyone, mentionUsers: e.mentions.map(e => e.id || e), mentionRoles: e.mentionRoles || e.mention_roles }),
+      isMentioned: (e, id) => isMentioned({ userId: id, channelId: e.channel_id, mentionEveryone: e.mentionEveryone || e.mention_everyone, mentionUsers: e.mentions.map(e => e.id || e), mentionRoles: e.mentionRoles || e.mention_roles, mentionGames: [] }),
       DiscordUtils: ZeresPluginLibrary.WebpackModules.getByProps('bindAll', 'debounce')
     };
 
@@ -731,9 +731,6 @@ https://astranika.com/bd/download?plugin=1XenoLib`, {
 
                 #${this.style.menuMessages} {
                   max-height: 0px;
-                }
-                .${this.style.menuRoot} .${XenoLib.getSingleClass('base wrapper')} {
-                  width: 100%;
                 }
                 .${this.style.menuRoot} .${this.style.questionMark} {
                   margin-left: 5px;
@@ -3006,10 +3003,10 @@ https://astranika.com/bd/download?plugin=1XenoLib`, {
       const guild = channel.guild_id ? this.tools.getServer(channel.guild_id) : false;
 
       let author = dispatch.message && dispatch.message.author ? this.tools.getUser(dispatch.message.author.id) : false;
-      if (!author) author = ((this.channelMessages[channel.id] || { _map: {} })._map[dispatch.message ? dispatch.message.id : dispatch.id] || {}).author;
+      if (!author) author = (this.channelMessages[channel.id]?.get(dispatch.message?.id || dispatch.id) || {}).author;
       if (!author) {
         // last ditch attempt
-        let message = this.getCachedMessage(dispatch.id);
+        let message = this.getCachedMessage(dispatch.message?.id || dispatch.id, channel.id);
         if (message) author = this.tools.getUser(message.author.id);
       }
 
@@ -3155,7 +3152,7 @@ https://astranika.com/bd/download?plugin=1XenoLib`, {
               });
             }
           }
-        } else if (dispatch.type == 'MESSAGE_CREATE' && dispatch.message && (dispatch.message.content.length || (dispatch.attachments && dispatch.attachments.length) || (dispatch.embeds && dispatch.embeds.length)) && dispatch.message.state != 'SENDING' && !dispatch.optimistic && (dispatch.message.type === 0 || dispatch.message.type === 19 || dispatch.message.type === 20) && this.tools.isMentioned(dispatch.message, this.localUser.id)) {
+        } else if (dispatch.type == 'MESSAGE_CREATE' && dispatch.message && (dispatch.message.content.length || (dispatch.message.attachments && dispatch.message.attachments.length) || (dispatch.message.embeds && dispatch.message.embeds.length)) && dispatch.message.state != 'SENDING' && !dispatch.optimistic && (dispatch.message.type === 0 || dispatch.message.type === 19 || dispatch.message.type === 20) && this.tools.isMentioned(dispatch.message, this.localUser.id)) {
           if (this.cachedMessageRecord.findIndex(m => m.id === dispatch.message.id) != -1) return callDefault(...args);
           this.cachedMessageRecord.push(dispatch.message);
         }
@@ -3418,7 +3415,7 @@ https://astranika.com/bd/download?plugin=1XenoLib`, {
         }
         this.saveData();
         return callDefault(...args);
-      } else if (dispatch.type == 'MESSAGE_CREATE' && dispatch.message && (dispatch.message.content.length || (dispatch.attachments && dispatch.attachments.length) || (dispatch.embeds && dispatch.embeds.length)) && dispatch.message.state != 'SENDING' && !dispatch.optimistic && (dispatch.message.type === 0 || dispatch.message.type === 19 || dispatch.message.type === 20)) {
+      } else if (dispatch.type == 'MESSAGE_CREATE' && dispatch.message && (dispatch.message.content.length || (dispatch.message.attachments && dispatch.message.attachments.length) || (dispatch.message.embeds && dispatch.message.embeds.length)) && dispatch.message.state != 'SENDING' && !dispatch.optimistic && (dispatch.message.type === 0 || dispatch.message.type === 19 || dispatch.message.type === 20)) {
         if (this.cachedMessageRecord.findIndex(m => m.id === dispatch.message.id) != -1) return callDefault(...args);
         this.cachedMessageRecord.push(dispatch.message);
 
@@ -4774,16 +4771,14 @@ Pro tip: Right clicking the icon will filter the messages to the current channel
       this.refilterMessages();
     };
 
-    const Text = ZeresPluginLibrary.DiscordModules.TextElement;
     const onClearLog = e => {
-      if (!Text) return;
       if (document.getElementById(this.style.filter).parentElement.parentElement.className.indexOf(this.createTextBox.classes.focused[0]) != -1) return;
       let type = this.menu.selectedTab;
       if (type === 'ghostpings') type = 'ghost pings';
       else type += ' messages';
 
       BdApi.UI.showConfirmationModal('Clear log',
-        BdApi.React.createElement(Text, { size: Text.Sizes.SIZE_16, children: [`Are you sure you want to delete all ${type}${this.menu.filter.length ? ' that also match filter' : ''}?`] }),
+        `Are you sure you want to delete all ${type}${this.menu.filter.length ? ' that also match filter' : ''}?`,
         {
           confirmText: 'Confirm',
           danger: true,
