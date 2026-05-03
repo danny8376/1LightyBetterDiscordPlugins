@@ -3,7 +3,7 @@
  * @description Simple library to complement plugins with shared code without lowering performance. Also adds needed buttons to some plugins.
  * @author 1Lighty
  * @authorId 239513071272329217
- * @version 1.4.31
+ * @version 1.4.34
  * @invite NYvWdN5
  * @donate https://paypal.me/lighty13
  * @source https://github.com/1Lighty/BetterDiscordPlugins/blob/master/Plugins/1XenoLib.plugin.js
@@ -99,7 +99,8 @@ try {
     '        const wasEnabled = BdApi?.isSettingEnabled("settings", "general", "showToasts");\n        if (wasEnabled) BdApi?.disableSetting("settings", "general", "showToasts");\n        this._reloadPlugins();\n        if (wasEnabled) BdApi?.enableSetting("settings", "general", "showToasts");': '',
     'return new _domtools__WEBPACK_IMPORTED_MODULE_1__["default"].ClassName(obj[prop]);': 'return obj[prop];',
     'this.root = root || document.getElementById("app-mount");': 'this.root = root || document.body;',
-    'get dividerElement() {return modules__WEBPACK_IMPORTED_MODULE_1__.DiscordModules.React.createElement("div", {className: modules__WEBPACK_IMPORTED_MODULE_1__.DiscordClasses.Dividers.divider.add(modules__WEBPACK_IMPORTED_MODULE_1__.DiscordClasses.Margins.marginTop20).toString()});}': 'get dividerElement() {return modules__WEBPACK_IMPORTED_MODULE_1__.DiscordModules.React.createElement("div", {className: modules__WEBPACK_IMPORTED_MODULE_1__.DiscordClasses.Dividers.divider + " " + modules__WEBPACK_IMPORTED_MODULE_1__.DiscordClasses.Margins.marginTop20});}'
+    'get dividerElement() {return modules__WEBPACK_IMPORTED_MODULE_1__.DiscordModules.React.createElement("div", {className: modules__WEBPACK_IMPORTED_MODULE_1__.DiscordClasses.Dividers.divider.add(modules__WEBPACK_IMPORTED_MODULE_1__.DiscordClasses.Margins.marginTop20).toString()});}': 'get dividerElement() {return modules__WEBPACK_IMPORTED_MODULE_1__.DiscordModules.React.createElement("div", {className: modules__WEBPACK_IMPORTED_MODULE_1__.DiscordClasses.Dividers.divider + " " + modules__WEBPACK_IMPORTED_MODULE_1__.DiscordClasses.Margins.marginTop20});}',
+    'module.exports.ZeresPluginLibrary = __webpack_exports__["default"];': 'module.exports = __webpack_exports__["default"];'
   }
 
   let ZLibCode = fs.readFileSync(path.join(__dirname, '0PluginLibrary.plugin.js'), 'utf8');
@@ -139,7 +140,7 @@ module.exports = (() => {
           twitter_username: ''
         }
       ],
-      version: '1.4.31',
+      version: '1.4.34',
       description: 'Simple library to complement plugins with shared code without lowering performance. Also adds needed buttons to some plugins.',
       github: 'https://github.com/1Lighty',
       github_raw: 'https://raw.githubusercontent.com/1Lighty/BetterDiscordPlugins/master/Plugins/1XenoLib.plugin.js'
@@ -147,7 +148,7 @@ module.exports = (() => {
     changelog: [
       {
         type: 'fixed',
-        items: ['Fixed notifs.']
+        items: ['Updater checks changes.']
       }
     ],
     defaultConfig: [
@@ -335,7 +336,7 @@ module.exports = (() => {
     XenoLib.getClass = (arg, thrw) => {
       try {
         const args = arg.split(' ');
-        return WebpackModules.getByProps(...args)[args[args.length - 1]];
+        return BdApi.Webpack.getByKeys(...args)[args[args.length - 1]];
       } catch (e) {
         if (thrw) throw e;
         if (XenoLib.DiscordAPI.userId === '239513071272329217' && !XenoLib.getClass.__warns[arg] || Date.now() - XenoLib.getClass.__warns[arg] > 1000 * 60) {
@@ -2667,7 +2668,9 @@ module.exports = (() => {
           if (!BdApi.Plugins) return; /* well shit what now */
           const list = BdApi.Plugins.getAll().filter(k => k._XL_PLUGIN || (k.instance && k.instance._XL_PLUGIN)).map(k => k.instance || k);
           for (let p = 0; p < list.length; p++) try {
-            BdApi.Plugins.reload(list[p].getName());
+            setTimeout(() => {
+              BdApi.Plugins.reload(list[p].getName());
+            }, 100);
           } catch (e) {
             try {
               Logger.stacktrace(`Failed to reload plugin ${list[p].getName()}`, e);
@@ -2712,32 +2715,31 @@ module.exports = (() => {
           }
           setTimeout(() => {
             try {
-              const https = require('https');
               for (const { name, file } of pluginsToCheck) {
                 // eslint-disable-next-line no-undef
                 const isPluginEnabled = BdApi.Plugins.isEnabled(name);
                 let plugin = BdApi.Plugins.get(name);
                 if (plugin && plugin.instance) plugin = plugin.instance;
                 // eslint-disable-next-line no-loop-func
-                const req = https.request(`https://raw.githubusercontent.com/1Lighty/BetterDiscordPlugins/master/Plugins/${name}/${name}.plugin.js`, { headers: { origin: 'discord.com' } }, res => {
-                  let body = '';
-                  // eslint-disable-next-line no-void
-                  res.on('data', chunk => ((body += chunk), void 0));
-                  res.on('end', () => {
+                const req = BdApi.Net.fetch(`https://raw.githubusercontent.com/1Lighty/BetterDiscordPlugins/master/Plugins/${name}/${name}.plugin.js`, { headers: { origin: 'discord.com' } }).then(r => {
+                  if (!r.ok) {
+                    throw new Error('Network request threw error ' + r.statusText);
+                  }
+                  return r.text();
+                }).then(body => {
+                  const _versionString = plugin && (name === 'MessageLoggerV2' || Utilities.getNestedProp(plugin, '_config.info.version')) && name === 'MessageLoggerV2' ? plugin.getVersion() : plugin._config.info.version;
+                  if (!_versionString || (_versionString && _versionString.split('.').length === 3 && !XenoLib.versionComparator(_versionString, XenoLib.extractVersion(body)))) return;
+                  const newFile = `${name}.plugin.js`;
+                  fs.unlinkSync(path.join(pluginsDir, file));
+                  // avoid BDs watcher being shit as per usual
+                  setTimeout(() => {
                     try {
-                      if (res.statusCode !== 200) return /* XenoLib.Notifications.error(`Failed to check for updates for ${name}`, { timeout: 0 }) */;
-                      if (plugin && (name === 'MessageLoggerV2' || Utilities.getNestedProp(plugin, '_config.info.version')) && !XenoLib.versionComparator(name === 'MessageLoggerV2' ? plugin.getVersion() : plugin._config.info.version, XenoLib.extractVersion(body))) return;
-                      const newFile = `${name}.plugin.js`;
-                      fs.unlinkSync(path.join(pluginsDir, file));
-                      // avoid BDs watcher being shit as per usual
-                      setTimeout(() => {
-                        try {
-                          fs.writeFileSync(path.join(pluginsDir, newFile), body);
-                          if (isPluginEnabled) setTimeout(() => BdApi.Plugins.enable(name), 3000);
-                        } catch (e) { }
-                      }, 1000);
+                      fs.writeFileSync(path.join(pluginsDir, newFile), body);
+                      if (isPluginEnabled) setTimeout(() => BdApi.Plugins.enable(name), 3000);
                     } catch (e) { }
-                  });
+                  }, 1000);
+                }).catch(err => {
+                  Logger.err(`Failed to update ${name}`, err);
                 });
                 req.on('error', _ => XenoLib.Notifications.error(`Failed to check for updates for ${name}`, { timeout: 0 }));
               }
@@ -2803,7 +2805,6 @@ module.exports = (() => {
 
       }
       showChangelog(footer) {
-        return;
         XenoLib.showChangelog(`${this.name} has been updated!`, this.version, this._config.changelog, void 0, true);
       }
       get name() {
