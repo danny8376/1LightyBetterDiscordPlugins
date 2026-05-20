@@ -1,6 +1,6 @@
 /**
  * @name MessageLoggerV2
- * @version 1.10.2
+ * @version 1.10.3
  * @invite NYvWdN5
  * @donate https://paypal.me/lighty13
  * @website https://1lighty.github.io/BetterDiscordStuff/?plugin=MessageLoggerV2
@@ -48,7 +48,7 @@ module.exports = class MessageLoggerV2 {
     return 'MessageLoggerV2';
   }
   getVersion() {
-    return '1.10.2';
+    return '1.10.3';
   }
   getAuthor() {
     return 'Lighty';
@@ -82,7 +82,7 @@ module.exports = class MessageLoggerV2 {
     try {
       this.shutdown();
       const currLocation = globalThis?.location?.pathname;
-      const transitionTo = BdApi.Webpack.getByStrings('transitionTo - Transitioning to ', { searchExports: true }) || (() => { });
+      const transitionTo = Webpack.getByStrings('transitionTo - Transitioning to ', { searchExports: true }) || (() => { });
       transitionTo('/channels/@me'); // dirty fix for crash
       if (currLocation) setTimeout(() => transitionTo(currLocation), 500);
     } catch (err) {
@@ -95,30 +95,29 @@ module.exports = class MessageLoggerV2 {
         title: 'Fixed',
         type: 'fixed',
         items: [
-          'Hopefully fixed edits not showing up sometimes, also added some sort of warning and fallback if it happens again.'
+          'Should no longer throw error about patching message components.. as much?',
+        ]
+      },
+      {
+        title: 'WIP',
+        type: 'progress',
+        items: [
+          'Images now open in the menu PARTIALLY, will implement something to either load images within Discord, or just open the image with system default image viewer instead.'
         ]
       },
       {
         title: 'MessageLoggerV2 is now standalone!',
         type: 'progress',
         items: [
-          'I have combed thru the plugin and removed its XenoLib and ZeresPluginLibrary dependency to ease the burden on users, make the whole experience easier, as well as to finally ditch the deprecated ZeresPluginLibrary which might have been causing issues.',
           '----> **YOU CAN SAFELY DELETE XENOLIB AND ZERESPLUGINLIBRARY** <----',
-          'It is advisable you do to avoid issues.'
-        ]
-      },
-      {
-        title: 'Added',
-        type: 'added',
-        items: [
-          'Added back notification settings for servers which were inadvertently vanished in the transition, oops'
+          'You MUST delete them if you still have them!!'
         ]
       }
     ];
   }
 
   showChangelog() {
-    const AnchorClasses = BdApi.Webpack.getByKeys('anchor', 'anchorUnderlineOnHover') || {};
+    const AnchorClasses = Webpack.getByKeys('anchor', 'anchorUnderlineOnHover') || {};
     const renderFooter = () => [
       React.createElement(this.TextElement || 'span',
         {
@@ -160,7 +159,7 @@ module.exports = class MessageLoggerV2 {
     if (this.__started) return BdApi.UI.showNotification({ title: this.getName(), content: `Tried to start twice..`, type: 'warning' });
     this.__started = true;
 
-    const lodash = this.lodash = BdApi.Webpack.getByKeys('bindAll', 'debounce');
+    const lodash = this.lodash = Webpack.getByKeys('bindAll', 'debounce');
 
     let defaultSettings = {
       obfuscateCSSClasses: true,
@@ -261,7 +260,7 @@ module.exports = class MessageLoggerV2 {
       this.automaticallyUpdate();
     }
 
-    this.TextElement = BdApi.Webpack.getBySource('data-excessive-heading-level', { declarationFilter: e => e?.render?.toString?.()?.includes('data-excessive-heading-level') });
+    this.TextElement = Webpack.getBySource('data-excessive-heading-level', { declarationFilter: e => e?.render?.toString?.()?.includes('data-excessive-heading-level') });
 
     if (global.XenoLib || global.ZeresPluginLibrary) {
       BdApi.UI.showConfirmationModal('XenoLib and ZeresPluginLibrary EOL', 'The libraries are deprecated and can cause issues, click Delete Now to delete them. Your Discord will refresh after.', {
@@ -341,10 +340,10 @@ module.exports = class MessageLoggerV2 {
     if (this.slowSaveModeStep) Logger.warn(this.getName(), 'Data file is too large, severity level', this.slowSaveModeStep);
 */
 
-    this.messageStore = Webpack.getByKeys('focusedMessageId', 'getMessages', 'getMessage');
+    this.messageStore = Webpack.Stores.MessageStore;
 
-    this.ChannelStore = Webpack.getByKeys('getChannel', 'getDMFromUserId');
-    this.SelectedChannelStore = Webpack.getByKeys('getChannelId', 'getLastSelectedChannelId');
+    this.ChannelStore = Webpack.Stores.ChannelStore;
+    this.SelectedChannelStore = Webpack.Stores.SelectedChannelStore;
 
     if (!this.settings.dontSaveData) {
       const records = data.messageRecord;
@@ -504,15 +503,16 @@ module.exports = class MessageLoggerV2 {
       isBlocked: Webpack.getByKeys('isBlocked').isBlocked,
       createMomentObject: Webpack.getByKeys('createFromInputFallback'),
       isMentioned: (e, id) => isMentioned({ userId: id, channelId: e.channel_id, mentionEveryone: e.mentionEveryone || e.mention_everyone, mentionUsers: e.mentions.map(e => e.id || e), mentionRoles: e.mentionRoles || e.mention_roles, mentionGames: [] }),
-      DiscordUtils: Webpack.getByKeys('bindAll', 'debounce')
     };
+
+    const { getClass } = this;
 
     this.createButton.classes = {
       button: (function () {
         let buttonData = Webpack.getByKeys('button', 'colorBrand');
         return `${buttonData.button} ${buttonData.lookFilled} ${buttonData.colorBrand} ${buttonData.sizeSmall} ${buttonData.grow}`;
       })(),
-      buttonContents: Webpack.getByKeys('button', 'colorBrand').contents
+      buttonContents: getClass('button colorBrand contents')
     };
 
     this.safeGetClass = (func, fail, heckoff) => {
@@ -524,10 +524,8 @@ module.exports = class MessageLoggerV2 {
       }
     };
 
-    const { getClass } = this;
-
     this.multiClasses = {
-      defaultColor: Webpack.getByKeys('defaultColor').defaultColor,
+      defaultColor: getClass('defaultColor'),
       get edited() {
         delete this.edited;
         return this.edited = className(getClass('separator timestamp'), getClass('separator timestampInline'));
@@ -535,20 +533,20 @@ module.exports = class MessageLoggerV2 {
       markup: Webpack.getByKeys('markup')['markup'],
       message: {
         cozy: {
-          containerBounded: this.safeGetClass(() => Webpack.getByKeys('containerCozyBounded').containerCozyBounded, 'containerCozyBounded'),
-          header: this.safeGetClass(() => Webpack.getByKeys('containerCozyBounded').headerCozy, 'headerCozy'),
-          avatar: this.safeGetClass(() => Webpack.getByKeys('containerCozyBounded').avatar, 'avatar'),
-          headerMeta: this.safeGetClass(() => Webpack.getByKeys('containerCozyBounded').headerCozyMeta, 'headerCozyMeta'),
-          username: this.safeGetClass(() => Webpack.getByKeys('containerCozyBounded').username, 'username'),
-          timestamp: this.safeGetClass(() => Webpack.getByKeys('containerCozyBounded').timestampCozy, 'timestampCozy'),
-          content: this.safeGetClass(() => Webpack.getByKeys('containerCozyBounded').contentCozy, 'contentCozy')
+          containerBounded: this.safeGetClass(() => getClass('containerCozyBounded', true), 'containerCozyBounded'),
+          header: this.safeGetClass(() => getClass('containerCozyBounded', true), 'headerCozy'),
+          avatar: this.safeGetClass(() => getClass('containerCozyBounded', true), 'avatar'),
+          headerMeta: this.safeGetClass(() => getClass('containerCozyBounded', true), 'headerCozyMeta'),
+          username: this.safeGetClass(() => getClass('containerCozyBounded', true), 'username'),
+          timestamp: this.safeGetClass(() => getClass('containerCozyBounded', true), 'timestampCozy'),
+          content: this.safeGetClass(() => getClass('containerCozyBounded', true), 'contentCozy')
         }
       }
     };
 
     this.classes = {
-      markup: Webpack.getByKeys('markup')['markup'].split(/ /g)[0],
-      hidden: Webpack.getByKeys('spoilerContent', 'hidden').hidden.split(/ /g)[0],
+      markup: this.getSingleClass('markup'),
+      hidden: this.getSingleClass('spoilerContent hidden'),
       /* messages: this.safeGetClass(
         () => `.${Webpack.getByKeys('container', 'containerCompactBounded').container.split(/ /g)[0]} > div:not(.${Webpack.getByKeys('content', 'marginCompactIndent').content.split(/ /g)[0]})`,
         this.safeGetClass(() => `.${this.getSingleClass('scroller messages')} > .${this.getSingleClass('channelTextArea message')}`, 'Lighty-youre-a-failure-my-fucking-god'),
@@ -557,7 +555,7 @@ module.exports = class MessageLoggerV2 {
       avatar: this.safeGetClass(() => this.getSingleClass('header avatar', true), 'avatar-MLV2')
     };
 
-    this.muteModule = Webpack.getModule(m => m.isChannelMuted);
+    this.muteModule = BdApi.Webpack.Stores.UserGuildSettingsStore;
 
     this.menu = {};
     this.menu.classes = {};
@@ -567,24 +565,23 @@ module.exports = class MessageLoggerV2 {
     const chatContent = Webpack.getByKeys('chatContent');
     this.observer.chatContentClass = ((chatContent && chatContent.chatContent) || 'chat-3bRxxu').split(/ /g)[0];
     this.observer.chatClass = this.getClass('chatContent chat') || 'chat_f75fb0';
-    this.observer.titleClass = !chatContent ? 'ERROR-CLASSWTF' : Webpack.getByKeys('title', 'chatContent').title.split(/ /g)[0];
-    this.observer.containerCozyClass = this.safeGetClass(() => Webpack.getByKeys('containerCozyBounded').containerCozyBounded.split(/ /g)[0], 'containerCozyBounded');
+    this.observer.titleClass = !chatContent ? 'ERROR-CLASSWTF' : this.getSingleClass('chatContent title');
+    this.observer.containerCozyClass = this.safeGetClass(() => this.getSingleClass('containerCozyBounded', true), 'containerCozyBounded');
 
     this.localUser = this.UserStore.getCurrentUser();
 
-    this.ModalStack = BdApi.Webpack.getMangled(/\w=null!=\w\.modalKey\?\w\.modalKey:\w\(\)\(\)/, {
-      openModalAsync: BdApi.Webpack.Filters.byRegex(/\w=null!=\w\.modalKey\?\w\.modalKey:\w\(\)\(\)/),
-      openModal: BdApi.Webpack.Filters.byRegex(/modalKey:\w,dismissable:\w,/),
-      closeModal: BdApi.Webpack.Filters.byRegex(/null!=\w&&null!=\w\.onCloseCallback&&\w\.onCloseCallback\(\)/),
-      closeAllModals: BdApi.Webpack.Filters.byRegex(/getState\(\);for\(let \w in \w\)for\(let \w of \w\[\w\]\)\w\(\w\.key,\w\)/),
-      hasModalOpen: BdApi.Webpack.Filters.byRegex(/return \w\(\w\.getState\(\),\w,\w\)/),
-      modalStore: e => e.getState && e.setState && e.subscribe
-    });
+    this.ModalStack = Webpack.getByKeys("openModal");
 
     this.deletedChatMessagesCount = {};
     this.editedChatMessagesCount = {};
 
-    this.channelMessages = Webpack.getModule(m => m._channelMessages)._channelMessages;
+    this.channelMessages = BdApi.Webpack.getByKeys('_channelMessages')?._channelMessages;
+
+    if (!this.channelMessages) {
+      Logger.error(this.getName(), 'Failed to find _channelMessages!');
+      BdApi.UI.showNotification({ title: this.getName(), content: 'Failed to start plugin! Critical error: _channelMessagesf not found!', duration: Infinity, type: 'error' });
+      return;
+    }
 
     this.autoBackupSaveInterupts = 0;
 
@@ -868,7 +865,7 @@ module.exports = class MessageLoggerV2 {
     this.patchModal();
 
     // const createKeybindListener = () => {
-    //   this.keybindListener = new (BdApi.Webpack.getModule(m => typeof m === 'function' && m.toString().includes('.default.setOnInputEventCallback')))();
+    //   this.keybindListener = new (Webpack.getModule(m => typeof m === 'function' && m.toString().includes('.default.setOnInputEventCallback')))();
     //   this.keybindListener.on('change', e => {
     //     if (this.settings.disableKeybind) return; // todo: destroy if disableKeybind is set to true and don't make one if it was true from the start
     //     // this is the hackiest thing ever but it works xdd
@@ -942,7 +939,7 @@ module.exports = class MessageLoggerV2 {
     }, 60 * 1000 * 5); // every 5 minutes, no need to spam it, could be intensive
 
     this.menu.randomValidChannel = (() => {
-      const channels = this.ChannelStore.getChannels ? this.ChannelStore.getChannels() : Webpack.getByKeys('getChannels').getChannels();
+      const channels = Webpack.Stores.GuildChannelStore.getChannels();
       var keys = Object.keys(channels);
       return channels[keys[(keys.length * Math.random()) << 0]];
     })();
@@ -1824,7 +1821,7 @@ module.exports = class MessageLoggerV2 {
   getClass(arg, thrw) {
     try {
       const args = arg.split(' ');
-      return BdApi.Webpack.getByKeys(...args)[args[args.length - 1]];
+      return Webpack.getByKeys(...args)[args[args.length - 1]];
     } catch (e) {
       if (thrw) throw e;
       if (!this.getClass.__warns) this.getClass.__warns = [];
@@ -2926,43 +2923,63 @@ module.exports = class MessageLoggerV2 {
   }
   createModal(options, image, name) {
     if (image) {
-      const openMediaViewer = Object.values(BdApi.Webpack.getBySource(/numMediaItems:\w\.items\.length,source:_,hasMediaOptions:!\w\.shouldHideMediaOptions/) || {})[0];
-      if (!openMediaViewer || typeof openMediaViewer !== 'function') return BdApi.UI.showToast('Failed to open image modal, missing dependency');
+      const openMediaViewer = Webpack.getBySource('Media Viewer Modal', { declarationFilter: e => typeof e === 'function' });
+      if (typeof openMediaViewer !== 'function') return BdApi.UI.showToast('Failed to open image modal, missing dependency');
+      if (!options.message) return;
 
       /*
       {
-        className: p.modal,
-        onClose: this.onCloseImage,
-        items: [{
-          alt: undefined,
-          animated: false,
-          children: undefined,
-          height: 1894,
-          original: 'X',
-          sourceMetadata: {
-            identifier: {
-              attachmentId: 'X',
-              filename: 'funny.jpeg',
-              size: 123456,
-              title: undefined,
-              type: 'attachment'
-            },
-            message: <message object>
-          },
-          srcIsAnimated: false,
-          trigger: 'CLICK',
-          type: 'IMAGE',
-          url: 'X',
-          width: 2048
-          zoomThumbnailPlaceholder: 'X'
-        }],
-        shouldHideMediaOptions: h,
-        location: null != g ? g : "LazyImageZoomable",
-        contextKey: this.modalContext
-      })
+          "items": [
+              {
+                  "url": "https://media.discordapp.net/attachments/633043211920736272/1504159671789944832/bafkreiblgtjkdczvqzfiqbf45wc4ji5eaxfhbzvadoeqrckft64vdfjwjq.webp?ex=6a05f95b&is=6a04a7db&hm=85b2b5862087323806b92a4dbd91fdd22294408448909846b92acfcc316055f2&",
+                  "width": 1362,
+                  "height": 1192,
+                  "type": "IMAGE",
+                  "contentType": "image/webp",
+                  "originalContentType": "image/webp",
+                  "zoomThumbnailPlaceholder": "https://media.discordapp.net/attachments/633043211920736272/1504159671789944832/bafkreiblgtjkdczvqzfiqbf45wc4ji5eaxfhbzvadoeqrckft64vdfjwjq.webp?ex=6a05f95b&is=6a04a7db&hm=85b2b5862087323806b92a4dbd91fdd22294408448909846b92acfcc316055f2&=&format=webp&width=400&height=350",
+                  "animated": false,
+                  "srcIsAnimated": false,
+                  "trigger": "CLICK",
+                  "sourceMetadata": {
+                      "message": <MESSAGE>,
+                      "identifier": {
+                          "type": "attachment",
+                          "attachmentId": "1504159671789944832",
+                          "filename": "bafkreiblgtjkdczvqzfiqbf45wc4ji5eaxfhbzvadoeqrckft64vdfjwjq.webp",
+                          "size": 34200
+                      }
+                  },
+                  "original": "https://cdn.discordapp.com/attachments/633043211920736272/1504159671789944832/bafkreiblgtjkdczvqzfiqbf45wc4ji5eaxfhbzvadoeqrckft64vdfjwjq.webp?ex=6a05f95b&is=6a04a7db&hm=85b2b5862087323806b92a4dbd91fdd22294408448909846b92acfcc316055f2&"
+              }
+          ],
+          "shouldHideMediaOptions": false,
+          "location": "ImageComponentForMessageAttachment",
+          "contextKey": "default"
+      }
       */
-      return BdApi.UI.showToast('Not implemented yet');
-      return openMediaViewer(options);
+      const { message } = options;
+      const attachment = message.attachments[options.idx];
+      if (!attachment) return BdApi.UI.showToast('Failed to open image modal, attachment idx does not exist');
+
+      return openMediaViewer({
+        items: [
+          {
+            url: attachment.url,
+            width: attachment.width,
+            height: attachment.height,
+            type: 'IMAGE',
+            contentType: attachment.content_type,
+            originalContentType: attachment.original_content_type,
+            zoomThumbnailPlaceholder: attachment.proxy_url,
+            animated: false,
+            srcIsAnimated: false,
+            trigger: 'CLICK',
+            original: attachment.original
+          }
+        ],
+        shouldHideMediaOptions: true
+      });
     }
     this.ModalStack.openModal(props => React.createElement(this.createModal.confirmationModal, Object.assign({}, options, props, options.onClose ? { onClose: options.onClose } : {})), { modalKey: name });
   }
@@ -3606,8 +3623,8 @@ module.exports = class MessageLoggerV2 {
     return domNode[Object.keys(domNode).find((key) => key.startsWith("__reactInternalInstance") || key.startsWith("__reactFiber") || key.startsWith("__reactContainer"))];
   }
   async patchMessages() {
-    const Tooltip = BdApi.Webpack.getBySource('VoidTooltip cannot find DOM node', { declarationFilter: e => e.Colors && e.prototype?.shouldShowTooltip }) || (e => e.children);
-    const dateFormat = BdApi.Webpack.getModule(e => typeof e === 'function' && e?.toString()?.includes('sameDay'), { searchExports: true });
+    const Tooltip = Webpack.getBySource('VoidTooltip cannot find DOM node', { declarationFilter: e => e.Colors && e.prototype?.shouldShowTooltip }) || (e => e.children);
+    const dateFormat = Webpack.getModule(e => typeof e === 'function' && e?.toString()?.includes('sameDay'), { searchExports: true });
     //const i18n = ZeresPluginLibrary.WebpackModules.find(e => e.Messages && e.Messages.HOME);
     /* suck it you retarded asshole devilfuck */
     const SuffixEdited = React.memo(e => {
@@ -3641,13 +3658,16 @@ module.exports = class MessageLoggerV2 {
           }), `(${/* i18n.Messages.MESSAGE_EDITED uhhhhhhhhh what now? */'edited'})${e.__MLV2_hasMore === 'before' ? ` <(${e.__MLV2_numHidden})` : e.__MLV2_hasMore === 'after' ? ` (${e.__MLV2_numHidden})>` : ''}`))
     });
     SuffixEdited.displayName = 'SuffixEdited';
-    const MemoMessage = BdApi.Webpack.getBySource("Message must not be a thread starter message", { declarationFilter: x => String(x?.type).includes("Message must not be a thread starter message") });
-    const MessageContent = BdApi.Webpack.getModule(e => !!e?.type?.toString()?.match(/,\w=\w\.state===\w\.(?:\w[^.]+)\.SEND_FAILED,\w=\w\.state===\w\.(?:\w[^.]+)\.SENDING/));
+    await new Promise(res => {
+      const sub = this.subscribeToQuerySelector(() => (this.unsubscribeObserver(sub), res()), 'li[class*="messageListItem__"]');
+    })
+    const MemoMessage = Webpack.getBySource("Message must not be a thread starter message", { declarationFilter: x => String(x?.type).includes("Message must not be a thread starter message") });
+    const MessageContent = Webpack.getModule(e => !!e?.type?.toString()?.match(/,\w=\w\.state===\w\.(?:\w[^.]+)\.SEND_FAILED,\w=\w\.state===\w\.(?:\w[^.]+)\.SENDING/));
 
     if (!MessageContent || !MemoMessage) return BdApi.UI.showNotification({ title: this.getName(), content: '[MessageLoggerV2] Failed to patch message components, edit history and deleted tint will not show!', type: 'error', duration: Infinity });
 
     const parseContent = (() => {
-      const parse = BdApi.Webpack.getByStrings('customRenderedContent', 'hideSimpleEmbedContent');
+      const parse = Webpack.getByStrings('customRenderedContent', 'hideSimpleEmbedContent');
       if (!parse) {
         Logger.warn(this.getName(), 'Could not set up parseContent, edits will not have markdown');
         BdApi.UI.showNotification({ title: this.getName(), content: 'Internal error: parseContent not found, edits will not have markdown!', type: 'warning' });
@@ -3880,7 +3900,7 @@ module.exports = class MessageLoggerV2 {
 
     try {
       const confirmationModalRegex = /header:\w,children:\w,confirmText:\w,cancelText:\w,className:\w,onConfirm:\w,onCancel:\w,onClose:\w,onCloseCallback:\w/;
-      const confirmModal = Object.values(BdApi.Webpack.getBySource(confirmationModalRegex) || {}).find(e => typeof e === 'function' && e.toString().match(confirmationModalRegex)) || (() => null);
+      const confirmModal = Object.values(Webpack.getBySource(confirmationModalRegex) || {}).find(e => typeof e === 'function' && e.toString().match(confirmationModalRegex)) || (() => null);
       this.createModal.confirmationModal = props => {
         try {
           const ret = confirmModal(props);
@@ -3899,8 +3919,8 @@ module.exports = class MessageLoggerV2 {
         }
       };
     } catch { }
-    if (this.ModalStack.modalStore?.subscribe) {
-      this._modalsApiUnsubcribe = this.ModalStack.modalStore.subscribe(_ => {
+    if (this.ModalStack.useModalsStore?.subscribe) {
+      this._modalsApiUnsubcribe = this.ModalStack.useModalsStore.subscribe(_ => {
         if (this.menu.open && !this.ModalStack.hasModalOpen(this.style.menu)) {
           this.menu.filter = '';
           this.menu.open = false;
@@ -4498,18 +4518,7 @@ module.exports = class MessageLoggerV2 {
                     this.saveData();
                     return;
                   }
-                  this.createModal(
-                    {
-                      src: attachment.url + '?ML2=true', // self identify
-                      placeholder: attachment.url, // cute image here
-                      original: attachment.url,
-                      width: attachment.width,
-                      height: attachment.height,
-                      onClickUntrusted: e => e.openHref(),
-                      className: this.style.imageRoot
-                    },
-                    true
-                  );
+                  this.createModal({ message, idx }, true);
                 });
               }
               img.onerror = () => {
@@ -4709,7 +4718,7 @@ module.exports = class MessageLoggerV2 {
           const message = this.getMessageAny(x);
           if (!message) return false;
           const channel = this.tools.getChannel(message.channel_id);
-          const member = BdApi.Webpack.Stores.GuildMemberStore.getMember(message.guild_id || (channel && channel.guild_id), message.author.id);
+          const member = Webpack.Stores.GuildMemberStore.getMember(message.guild_id || (channel && channel.guild_id), message.author.id);
           return message.author.id == filter || message.author.username.toLowerCase().includes(filter.toLowerCase()) || (member && member.nick && member.nick.toLowerCase().includes(filter.toLowerCase()));
         });
 
@@ -4971,7 +4980,7 @@ Pro tip: Right clicking the icon will filter the messages to the current channel
           if (!stateNode) return;
           stateNode.addEventListener(
             'scroll',
-            this.tools.DiscordUtils.debounce(() => {
+            this.lodash.debounce(() => {
               this.scrollPosition = document.getElementById(this.style.menuMessages).parentElement.parentElement.parentElement.scrollTop;
             }, 100)
           );
